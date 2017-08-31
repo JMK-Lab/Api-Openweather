@@ -1,5 +1,7 @@
 package fr.jmklab.apiopenweather;
 
+import fr.jmklab.apiopenweather.exceptions.ApiHttpError;
+import fr.jmklab.apiopenweather.exceptions.ApiRestError;
 import fr.jmklab.apiopenweather.exceptions.ApiUnthorizedException;
 import fr.jmklab.apiopenweather.models.ApiResponse;
 import com.google.gson.Gson;
@@ -54,7 +56,8 @@ public class Api {
         client.newCall(request).enqueue(new Callback() {
 
             public void onFailure(Call call, IOException e) {
-                e.printStackTrace();
+                ApiHttpError apiHttpError = new ApiHttpError("Warning", e);
+                callback.onFailure(apiHttpError);
             }
 
             public void onResponse(Call call, Response response) throws IOException {
@@ -65,31 +68,19 @@ public class Api {
 
                 ApiResponse decode = gson.fromJson(response.body().string(), ApiResponse.class);
 
-                if (response.code() >= 200 && response.code() < 300) {
+                if (response.isSuccessful()) {
 
                     callback.onReponse(decode);
 
+                } else if (response.code() == 401) {
+
+                    ApiUnthorizedException e = new ApiUnthorizedException("Invalid API key. Please see http://openweathermap.org/faq#error401 for more info.");
+                    callback.onUnthorized(e);
+
                 } else {
 
-                    // http://www.restapitutorial.com/httpstatuscodes.html
-
-                    if (response.code() == 401) {
-
-                        ApiUnthorizedException e = new ApiUnthorizedException("Invalid API key. Please see http://openweathermap.org/faq#error401 for more info.");
-                        callback.onUnthorized(e);
-
-                    }
-
-                    if (response.code() == 403) {
-
-
-
-                    }
-
-
-
-
-
+                    ApiRestError e = new ApiRestError("HTTP Error : " + response.code() + " error. " + response.body().string());
+                    callback.onRestError(e);
 
                 }
 
